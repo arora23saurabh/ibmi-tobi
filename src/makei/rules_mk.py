@@ -89,6 +89,8 @@ class MKRule:
         try:
             target_type = self.target.split(".")[-1].upper()
             source_file = decompose_filename(self.source_file)[2].upper()
+            if target_type == "PROCEDURE" and source_file != "SQLPRC":
+                raise ValueError("A .PROCEDURE target requires a .sqlprc source")
 
             if source_file == "QMQRY":
                 recipe_name = "SQL_TO_QMQRY_RECIPE"

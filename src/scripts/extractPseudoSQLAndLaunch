@@ -15,6 +15,7 @@ output=$7
 text_command=$8
 VPATH=$9
 temp_file=${10}
+procedure_stamp=${11}
 
 objectExists="false"
 shouldProcess="true"
@@ -26,6 +27,14 @@ do
     objectExists="true"
   fi
 done
+
+if [[ -n "$procedure_stamp" ]]; then
+  # For a registration, the validated catalog-backed stamp replaces the QSYS object.
+  objectExists="false"
+  [[ -e "$procedure_stamp" ]] && objectExists="true"
+  # A failed or interrupted registration must be retried, even if some SQL succeeded.
+  rm -f -- "$procedure_stamp" || exit 1
+fi
 
 while read -r line; do
   if [[ "$line" == *"{"* ]]; then
@@ -48,3 +57,12 @@ while read -r line; do
 done < <(grep "" $source)
 
 "$SCRIPT_DIR"/launch "$joblog_json" "$cmd" "$precmd" "$postcmd" "$object" "$source" "$output" "" "$text_command"
+status=$?
+if [[ -n "$procedure_stamp" ]]; then
+  rm -f -- "$temp_file"
+  [[ $status -eq 0 ]] || exit "$status"
+  PYTHONPATH="${SCRIPT_DIR}/..":${PYTHONPATH} /QOpenSys/pkgs/bin/python3.9 -m makei.sql_procedure \
+    "$tmpCurlib" "${object%.PROCEDURE}" "$procedure_stamp"
+  exit $?
+fi
+exit "$status"

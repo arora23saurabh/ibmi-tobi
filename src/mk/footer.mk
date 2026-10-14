@@ -17,7 +17,7 @@ endef
 
 ifdef TARGETS
 TARGETS_$(d) := $(TARGETS)
-$(foreach tgt,$(TARGETS),$(eval vpath $(tgt) $(OBJPATH_$(d)))$(eval $(tgt)_d = $(d))$(eval $(call generate_rule,$(tgt),$(call escape_source,$($(tgt)_SRC)),$(foreach dep,$($(tgt)_DEP),$(call escape_source,$(dep))),$($(tgt)_RECIPE))))
+$(foreach tgt,$(TARGETS),$(eval vpath $(tgt) $(if $(filter %.PROCEDURE,$(tgt)),$(PROCEDUREPATH_$(d)),$(OBJPATH_$(d))))$(eval $(tgt)_d = $(d))$(eval $(call generate_rule,$(tgt),$(call escape_source,$($(tgt)_SRC)),$(foreach dep,$($(tgt)_DEP),$(call escape_source,$(dep))),$($(tgt)_RECIPE))))
 endif
 
 

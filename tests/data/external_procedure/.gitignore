@@ -1,0 +1,5 @@
+.deps/
+.logs/
+.makei-trace/
+.Rules.mk.build
+sample.sqlprc.backup

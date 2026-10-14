@@ -248,10 +248,15 @@ class BuildEnv:
         target_file_path = self.build_vars_path
 
         rules_mk_paths = self._collect_rules_mk_paths(Path("."))
+        procedure_targets = {}
         real_targets = []
         # Create Rules.mk.build for each Rules.mk
         for rules_mk_path in rules_mk_paths:
             rules_mk = RulesMk.from_file(rules_mk_path, str(self.src_dir), map(Path, self.iproj_json.include_path))
+            procedures = [rule.target for rule in rules_mk.rules
+                          if rule.target.endswith('.PROCEDURE') and not rule.commands]
+            if procedures:
+                procedure_targets[rules_mk_path.parent] = procedures
             rules_mk_src_obj_mapping = rules_mk.src_obj_mapping.copy()
             if self.targets and self.targets[0] != "all":
                 for target in self.targets:
@@ -312,6 +317,11 @@ class BuildEnv:
                 dir_var_map[path] = IBMiJson.from_file(path / ".ibmi.json", dir_var_map[path.parents[0]])
 
         list(map(map_ibmi_json_var, subdirs))
+        procedure_paths = {}
+        if procedure_targets:
+            from makei.sql_procedure import prepare_procedures
+            procedure_paths = prepare_procedures(
+                self.src_dir, procedure_targets, dir_var_map, self.iasp)
         # Python timestamp checking for optimization
         all_rules = []
         special_char_files = {}
@@ -335,7 +345,7 @@ class BuildEnv:
                     if check_specific_targets and escaped_target not in self.targets:
                         continue
                     # Check if target has special characters using helper
-                    if self._has_special_chars(rule.target):
+                    if self._has_special_chars(rule.target) and not rule.target.endswith('.PROCEDURE'):
                         # Special char file: Python checks timestamp
                         needs_rebuild = self._check_target_needs_rebuild(rule, objlib_path)
                         special_char_files[escaped_target] = needs_rebuild
@@ -409,6 +419,8 @@ OBJECT_TARGET_PATTERNS := {target_patterns}
 
 """)
             for subdir in subdirs:
+                if subdir in procedure_paths:
+                    file.write(f"PROCEDUREPATH_{subdir.absolute()} := {procedure_paths[subdir]}\n")
                 # print(dir_var_map[subdir].build)
                 file.write(
                     f"TGTCCSID_{subdir.absolute()} := {dir_var_map[subdir].build['tgt_ccsid']}\n")

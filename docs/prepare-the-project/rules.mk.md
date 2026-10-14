@@ -247,6 +247,68 @@ SA$MPLE.MODULE: SA$MPLE.RPGLE
 SA$MPLE.PGM: SA$MPLE.MODULE
 ```
 
+## External SQL procedures
+
+An external SQL procedure registers an existing program or service program in Db2;
+it does not create a program named after the procedure. Use an explicit `.PROCEDURE`
+target for this registration, separately from the implementation's `.PGM` or
+`.SRVPGM` target:
+
+```makefile
+SAMPLE.PGM: sample.pgm.rpgle
+SAMPLE.PROCEDURE: sample.sqlprc SAMPLE.PGM
+```
+
+The target name must match an explicit, uppercase, unquoted `SPECIFIC` name in the
+SQL source. The procedure must be registered in the directory's configured object
+library (`objlib`). For example, `sample.sqlprc` can contain:
+
+```sql
+CREATE OR REPLACE PROCEDURE SAMPLE ()
+  LANGUAGE RPGLE
+  SPECIFIC SAMPLE
+  PARAMETER STYLE GENERAL
+  EXTERNAL NAME 'SAMPLE';
+```
+
+The procedure name and implementation name need not match. The `SPECIFIC` name
+identifies an individual overload; give each overload its own source and target.
+Declare implementation programs, service programs, and other build dependencies
+explicitly in `Rules.mk`. TOBi does not infer dependencies from `EXTERNAL NAME`.
+
+TOBi records successful registrations under `.deps/procedures/`, separately for
+each host, IASP, object library, and source directory. On each build it validates
+these records against `QSYS2.SYSROUTINES` (resolving the SQL schema through
+`QSYS2.SYSSCHEMAS`). An unchanged second build skips the registration. Newer sources
+or dependencies, a missing success record, or a dropped/replaced/altered procedure
+cause another registration. A failed SQL execution removes the success record so
+the next build retries, even if part of the SQL script succeeded.
+
+After successful SQL execution, TOBi verifies that the expected external procedure
+exists before recording success. Missing or mismatched `SPECIFIC` names fail the
+build. Catalog query failures also fail the build rather than treating the
+registration as current. The build user needs access to these catalog views.
+
+The state files are local build artifacts; do not commit or distribute them. Removing
+`.deps/procedures/` forces re-registration on the next build. The usual Make force
+option (`makei build -o "-B"`) also forces a rebuild. As with ordinary object
+targets, timestamp checks do not detect every change to compiler options; force a
+rebuild after changing registration options. Separate concurrent builds should use
+separate working directories.
+
+Existing `.PGM: .sqlprc` rules retain their behavior and remain appropriate for SQL
+procedures that generate a corresponding program object. Automatic target inference
+is unchanged; selecting `.PROCEDURE` is explicit. This target supports external
+procedures only, not functions, quoted/mixed-case specific names, or registrations
+in a different library from the configured `objlib`.
+
+Use `CREATE OR REPLACE` so the SQL is safe to rerun when a success record is
+missing but the registration already exists. Avoid the legacy brace-delimited
+pseudo-SQL existence checks for this target: build-state existence is not the
+same as catalog existence. An [IBM i verification fixture](../../tests/data/external_procedure/README.md)
+covers first builds, unchanged builds, dependency changes, dropped registrations,
+and recovery after SQL failure.
+
 ## Further reading
 
 To learn more about makefile syntax, see the official [GNU Make documentation](https://www.gnu.org/software/make/manual/make.html).  Just remember that every object referenced in a TOBi makefile must have an IFS file suffix (`.PGM`, `.FILE`, etc.) and be written in upper case.

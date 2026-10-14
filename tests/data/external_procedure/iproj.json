@@ -1,0 +1,6 @@
+{
+  "description": "External procedure incremental build verification",
+  "objlib": "TBIPRCTST",
+  "curlib": "TBIPRCTST",
+  "tgtCcsid": "37"
+}
